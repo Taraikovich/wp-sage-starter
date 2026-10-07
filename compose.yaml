@@ -1,0 +1,118 @@
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - app
+
+  wordpress:
+    build:
+      context: .
+      dockerfile: docker/wordpress/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WP_PORT}:80"
+    environment:
+      WORDPRESS_DB_HOST: ${DB_HOST}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DEBUG: "1"
+      WP_HOME: ${WP_HOME}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('WP_HOME', getenv('WP_HOME') ?: 'http://localhost:8080');
+        define('WP_SITEURL', getenv('WP_HOME') ?: 'http://localhost:8080');
+        define('SCRIPT_DEBUG', true);
+    volumes:
+      - ./wordpress:/var/www/html
+      - ./docker/php/custom.ini:/usr/local/etc/php/conf.d/zz-custom.ini:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app
+
+  wpcli:
+    image: wordpress:cli-php8.3
+    profiles: ["tools"]
+    user: "33:33"
+    entrypoint: ["wp"]
+    environment:
+      WORDPRESS_DB_HOST: ${DB_HOST}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WP_HOME: ${WP_HOME}
+      WP_CLI_CACHE_DIR: /tmp/wp-cli-cache
+      WORDPRESS_DEBUG: "1"
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        define('WP_HOME', getenv('WP_HOME') ?: 'http://localhost:8080');
+        define('WP_SITEURL', getenv('WP_HOME') ?: 'http://localhost:8080');
+        define('SCRIPT_DEBUG', true);
+    volumes:
+      - ./wordpress:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+      wordpress:
+        condition: service_started
+    networks:
+      - app
+
+  node:
+    image: node:22-alpine
+    profiles: ["dev"]
+    working_dir: /app
+    command: npm run dev
+    environment:
+      APP_URL: ${WP_HOME}
+    ports:
+      - "${VITE_PORT}:5173"
+    volumes:
+      - ./wordpress/wp-content/themes/${THEME_SLUG}:/app
+    networks:
+      - app
+
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT}:8025"
+    networks:
+      - app
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    ports:
+      - "${PMA_PORT}:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app
+
+volumes:
+  db_data:
+
+networks:
+  app:
+    driver: bridge

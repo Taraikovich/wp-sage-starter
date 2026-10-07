@@ -1,0 +1,33 @@
+.env
+
+# Ядро WordPress копируется официальным образом при первом старте.
+wordpress/*
+!wordpress/wp-content/
+
+wordpress/wp-content/*
+!wordpress/wp-content/mu-plugins/
+!wordpress/wp-content/themes/
+!wordpress/wp-content/plugins/
+
+# Темы WordPress по умолчанию
+wordpress/wp-content/themes/twenty*/
+wordpress/wp-content/themes/index.php
+
+# Плагины ставятся через WP-CLI (WP_PLUGINS в .env) и не коммитятся.
+# Свои плагины кладите в plugins/ — они попадут в git.
+wordpress/wp-content/plugins/index.php
+wordpress/wp-content/plugins/akismet/
+wordpress/wp-content/plugins/hello.php
+wordpress/wp-content/plugins/codeideal-open-fields/
+wordpress/wp-content/plugins/contact-form-7/
+wordpress/wp-content/plugins/webp-uploads/
+
+# Sage / Node / Composer
+**/node_modules/
+**/vendor/
+**/public/build/
+**/public/hot
+*.log
+
+# Архивы для деплоя
+dist/
